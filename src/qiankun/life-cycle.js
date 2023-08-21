@@ -25,7 +25,6 @@ const lifeCycle = () => {
       Vue.prototype.$setGlobalState = setGlobalState;
       // 注册主应用下发的组件 工具类
       libraryInstall(Vue, store, props);
-      // common.initGlobalState(store, props);
       render(props);
     },
     async unmount() {

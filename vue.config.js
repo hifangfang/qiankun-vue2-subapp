@@ -1,48 +1,46 @@
 const path = require("path");
-const { name, port } = require("./package");
-debugger
-function resolve(dir) {
-  return path.join(__dirname, dir);
-}
-const dev = process.env.NODE_ENV === "development";
+const packageName = require("./package.json").name;
+const node_env = process.env.NODE_ENV === "production";
+const baseUrl = "/";
+const resolve = (dir) => path.join(__dirname, dir);
+// 同步获取在线JS
+const requireFromUrl = require('require-from-url/sync');
+// 微应用 - 读取线上 Webpack 配置文件（CDN 地址配置、忽略打包文件配置）
+const webpackOnline = '/global/config/config-webpack.js';
+const { cdn, externals } = requireFromUrl(webpackOnline);
 module.exports = {
-  publicPath: dev ? `//localhost:${port}` : "/",
-  outputDir: `../dist/${name}`,
+  outputDir: `../dist/${packageName}`,
+  publicPath: node_env ? baseUrl : "/",
   assetsDir: "static",
-  filenameHashing: true,
+  parallel: false,
   devServer: {
     hot: true,
     disableHostCheck: true,
-    historyApiFallback:true,
-    port,
-    overlay: {
-      warnings: false,
-      errors: true
-    },
+    host: process.env.VUE_APP_HOST,
+    port: process.env.VUE_APP_PORT, // 在.env中VUE_APP_PORT=7788，与父应用的配置一致
     headers: {
-      "Access-Control-Allow-Origin": "*"
+      "Access-Control-Allow-Origin": "*", // 主应用获取子应用时跨域响应头
     },
-    proxy: 'http://192.168.11.73:19013',
   },
-  // 自定义webpack配置
   configureWebpack: {
     resolve: {
       alias: {
-        "@": resolve("src")
-      }
+        "@": resolve("src"),
+      },
     },
     output: {
-      // 把子应用打包成 umd 库格式
-      library: `${name}-[name]`,
-      libraryTarget: "umd",
-      jsonpFunction: `webpackJsonp_${name}`
-    }
+      library: `${packageName}-[name]`,
+      libraryTarget: "umd", // 把微应用打包成 umd 库格式
+      jsonpFunction: `webpackJsonp_${packageName}`,
+    },
   },
-  // css: {
-  //   loaderOptions: {
-  //     sass: {
-  //       prependData: `@import "./src/assets/css/variables/variables.scss";`
-  //     }
-  //   }
-  // }
+  chainWebpack: (config) => {
+    config.plugin('html').tap((args) => {
+      // 在 html 中，注入 CDN 链接
+      args[0].cdn = cdn;
+      return args;
+    });
+    // 设置不参与打包
+    config.externals(externals)
+  },
 };
